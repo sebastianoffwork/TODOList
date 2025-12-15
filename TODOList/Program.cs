@@ -1,4 +1,5 @@
-﻿using TODO;
+﻿using Spectre.Console;
+using TODO;
 
 /*
  * Where all items would be saved.
@@ -13,77 +14,44 @@ List<Item> items = File.Exists(FILE)
     ? [.. File.ReadAllLines(FILE).Select(Item.Parse)]
     : [];
 
-Print(items.Count is 0 ? "No data available." : $"Loaded {items.Count} entries.", ConsoleColor.DarkGray);
-Print("Welcome!", ConsoleColor.Cyan);
-Print("Available commands:\n\nadd [text]\nAdd a task with [text].\n\ndone [index]\nMark task at [index] as done.\n\nlist\nList all tasks.\n\nexit\nExit the app.\n", ConsoleColor.Cyan);
+List<Command> commands = [
+    new AddCommand(),
+    new ListCommand(),
+    new DoneCommand(),
+    new DelCommand() 
+];
+
+foreach (var command in commands)
+{
+    AnsiConsole.MarkupLine($"[cyan][bold]{command.Name,-10} - {command.Description}[/][/]");
+}
 
 while (true)
 {
-    /*
-     * Parse the input.
-     */
-    string input = Console.ReadLine();
-    if (string.IsNullOrWhiteSpace(input)) continue;
-
+    Console.Write("> ");
+    string input = Console.ReadLine() ?? "";
     string[] parts = input.Split(' ', 2);
-    string command = parts[0]; 
-    /*
-     * Did we get an argument?
-     */
-    string argument = parts.Length > 1 ? parts[1] : "";
+    string commandStr = parts[0];
+    string arg = parts.Length > 1 ? parts[1] : "";
 
+    if (commandStr is "exit") break;
 
-    switch (command)
+    var command = commands.FirstOrDefault(c => c.Name == commandStr);
+
+    if (command is not null)
     {
-        case "add":
-            {
-                items.Add(new Item(argument));
-                Print("Added.", ConsoleColor.Cyan);
-                Save();
-                break;
-            }
-        case "list":
-            {
-                Console.WriteLine();
-                if (items.Count is 0) Print("No items.", ConsoleColor.DarkGray);
-
-                foreach (var item in items)
-                {
-                    char doneChar = item.IsDone ? 'x' : ' ';
-                    Console.WriteLine($"{items.IndexOf(item) + 1}. {item.Text} [{doneChar}]");
-                }
-                Console.WriteLine();
-                break;
-            }
-        case "done":
-            {
-                if (int.TryParse(argument, out int index) && index > 0 && index <= items.Count)
-                {
-                    items[index - 1] = items[index - 1] with { IsDone = true };
-
-                    Save();
-
-                    Print("Done.", ConsoleColor.Green);
-                }
-                else
-                {
-                    Print("Invalid index.", ConsoleColor.Red);
-                }
-                break;
-            }
-        case "exit":
-            {
-                Environment.Exit(0);
-                break;
-            }
+        /*
+         * If returned true, then we need to save.
+         */
+        if (command.Parse(arg, items))
+        {
+            Save();
+        }
     }
-}
-
-static void Print(string s, ConsoleColor color)
-{
-    Console.ForegroundColor = color;
-    Console.WriteLine(s);
-    Console.ResetColor();
+    else
+    {
+        AnsiConsole.MarkupLine("[red][bold]Error:[/][/] Invalid command.");
+    }
 }
 
 void Save()
